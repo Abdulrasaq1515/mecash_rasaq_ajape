@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Currency {
+  NGN
+  USD
+}
+
+enum TransactionType {
+  SAME_CURRENCY
+  CROSS_CURRENCY
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  username             String    @unique
+  firstName            String
+  lastName             String
+  passwordHash         String
+  resetToken           String?
+  resetTokenExpires    DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  account              Account?
+
+  @@map("users")
+}
+
+model Account {
+  id            String   @id @default(uuid())
+  accountNumber String   @unique
+  currency      Currency
+  balance       Decimal  @db.Decimal(19, 4)
+  userId        String?  @unique
+  isSystem      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user                 User?         @relation(fields: [userId], references: [id])
+  sentTransactions     Transaction[] @relation("SenderAccount")
+  receivedTransactions Transaction[] @relation("ReceiverAccount")
+
+  @@map("accounts")
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  reference         String            @unique
+  senderAccountId   String
+  receiverAccountId String
+  senderAmount      Decimal           @db.Decimal(19, 4)
+  receiverAmount    Decimal           @db.Decimal(19, 4)
+  senderCurrency    Currency
+  receiverCurrency  Currency
+  exchangeRate      Decimal?          @db.Decimal(19, 10)
+  type              TransactionType
+  status            TransactionStatus @default(PENDING)
+  description       String?
+  createdAt         DateTime          @default(now())
+  completedAt       DateTime?
+
+  senderAccount   Account @relation("SenderAccount", fields: [senderAccountId], references: [id])
+  receiverAccount Account @relation("ReceiverAccount", fields: [receiverAccountId], references: [id])
+
+  @@map("transactions")
+}
+
+model ExchangeRate {
+  id            String    @id @default(uuid())
+  fromCurrency  Currency
+  toCurrency    Currency
+  rate          Decimal   @db.Decimal(19, 10)
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@map("exchange_rates")
+}
